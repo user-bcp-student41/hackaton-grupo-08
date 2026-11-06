@@ -61,6 +61,54 @@ public class ApiException extends RuntimeException {
                 "No pudimos validar tu información, inténtalo de nuevo.", null);
     }
 
+    // ---- HU-02 (pagos de bajo monto) ----
+
+    /** 400 con {@code details.errors = [{field, reason}]} cuando se conocen los campos inválidos. */
+    public static ApiException invalidFields(List<Map<String, String>> errors) {
+        return new ApiException(400, "INVALID_REQUEST", "Revisa los datos enviados.", Map.of("errors", errors));
+    }
+
+    public static ApiException paymentNotFound() {
+        return new ApiException(404, "PAYMENT_NOT_FOUND", "No encontramos este pago.", null);
+    }
+
+    public static ApiException recipientNotFound() {
+        return new ApiException(404, "RECIPIENT_NOT_FOUND",
+                "No encontramos al destinatario. Revisa el dato e inténtalo de nuevo.", null);
+    }
+
+    public static ApiException walletNotActive() {
+        return new ApiException(409, "WALLET_NOT_ACTIVE",
+                "Tu wallet aún no está activa. Completa el onboarding para pagar.", null);
+    }
+
+    public static ApiException idempotencyKeyConflict() {
+        return new ApiException(409, "IDEMPOTENCY_KEY_CONFLICT",
+                "Esta clave ya se usó con otra solicitud. Genera una nueva operación.", null);
+    }
+
+    public static ApiException paymentNotRetryable(String reason) {
+        return new ApiException(409, "PAYMENT_NOT_RETRYABLE", "Este pago no se puede reintentar en este momento.",
+                Map.of("reason", reason));
+    }
+
+    /** 422 sin exponer el valor del límite (pregunta abierta P6). */
+    public static ApiException amountLimitExceeded() {
+        return new ApiException(422, "AMOUNT_LIMIT_EXCEEDED",
+                "El monto supera el máximo permitido para este canal.", Map.of("field", "amount"));
+    }
+
+    public static ApiException providerChannelUnsupported() {
+        return new ApiException(422, "PROVIDER_CHANNEL_UNSUPPORTED",
+                "El proveedor o canal elegido no está disponible para pagos.",
+                Map.of("fields", List.of("providerId", "channel")));
+    }
+
+    public static ApiException providerUnavailable() {
+        return new ApiException(503, "PROVIDER_UNAVAILABLE",
+                "No pudimos comunicarnos con el proveedor. Inténtalo de nuevo.", null);
+    }
+
     public static ApiException internal() {
         return new ApiException(500, "INTERNAL_ERROR",
                 "Ocurrió un error inesperado. Inténtalo de nuevo en unos minutos.", null);

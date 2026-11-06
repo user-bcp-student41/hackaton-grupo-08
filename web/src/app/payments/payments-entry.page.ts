@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { OnboardingApi } from '../onboarding/onboarding.api';
+import { PaymentFormComponent } from './payment-form.component';
 
 type AccessState = 'checking' | 'allowed' | 'blocked' | 'error';
 
@@ -10,7 +11,7 @@ type AccessState = 'checking' | 'allowed' | 'blocked' | 'error';
  */
 @Component({
   selector: 'app-payments-entry-page',
-  imports: [RouterLink],
+  imports: [RouterLink, PaymentFormComponent],
   template: `
     <main class="payments">
       <h1>Pagos de bajo monto</h1>
@@ -19,9 +20,8 @@ type AccessState = 'checking' | 'allowed' | 'blocked' | 'error';
           <p role="status">Verificando el estado de tu wallet…</p>
         }
         @case ('allowed') {
-          <p data-testid="payments-enabled">
-            Tu wallet está activa. El flujo de pago se habilita con HU-02.
-          </p>
+          <app-payment-form />
+          <p><a routerLink="/payments">Ver historial</a></p>
         }
         @case ('blocked') {
           <p data-testid="payments-blocked">
