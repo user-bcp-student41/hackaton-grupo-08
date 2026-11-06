@@ -25,8 +25,8 @@ type AccessState = 'checking' | 'allowed' | 'blocked' | 'error';
         }
         @case ('blocked') {
           <p data-testid="payments-blocked">
-            Tu wallet aún no está activa. Completa el onboarding para pagar.
-            <a routerLink="/onboarding">Ir al onboarding</a>
+            Tu wallet aún no está activa. Completa tu registro para pagar.
+            <a routerLink="/register">Ir al registro</a>
           </p>
         }
         @default {
