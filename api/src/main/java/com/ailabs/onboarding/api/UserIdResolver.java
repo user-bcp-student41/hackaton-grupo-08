@@ -8,15 +8,15 @@ import java.util.regex.Pattern;
  * un usuario. Debe reemplazarse por el mecanismo de autenticación real; el resto del módulo solo recibe el
  * {@code userId} resuelto.
  */
-final class UserIdResolver {
+public final class UserIdResolver {
 
-    static final String HEADER = "X-User-Id";
+    public static final String HEADER = "X-User-Id";
     private static final Pattern VALID = Pattern.compile("[A-Za-z0-9_-]{1,64}");
 
     private UserIdResolver() {
     }
 
-    static String resolve(String headerValue) {
+    public static String resolve(String headerValue) {
         if (headerValue == null || !VALID.matcher(headerValue.trim()).matches()) {
             throw ApiException.unauthenticated();
         }
