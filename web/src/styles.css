@@ -1,1 +1,71 @@
-/* You can add global styles to this file, and also import other style files */
+/*
+ * Tema corporativo de HU-01 (F5). Los valores concretos NO están confirmados por Producto (P3): estos son
+ * marcadores neutros y se reemplazan en un único lugar cuando llegue la paleta.
+ */
+:root {
+  --brand-primary: #1f2937;
+  --brand-primary-contrast: #ffffff;
+  --brand-accent: #2563eb;
+  --brand-surface: #ffffff;
+  --brand-background: #f3f4f6;
+  --brand-text: #111827;
+  --brand-error: #b91c1c;
+  --brand-success: #166534;
+}
+
+body {
+  margin: 0;
+  background: var(--brand-background);
+  color: var(--brand-text);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+.card {
+  max-width: 28rem;
+  margin: 1.5rem auto;
+  padding: 1.5rem;
+  background: var(--brand-surface);
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 15%);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.field input,
+.field select {
+  padding: 0.5rem;
+  font-size: 1rem;
+}
+
+.field-error {
+  color: var(--brand-error);
+  font-size: 0.875rem;
+}
+
+.btn {
+  background: var(--brand-accent);
+  color: var(--brand-primary-contrast);
+  border: 0;
+  border-radius: 0.25rem;
+  padding: 0.6rem 1rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.btn[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-link {
+  background: none;
+  border: 0;
+  color: var(--brand-accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
