@@ -1,12 +1,5 @@
-.venv
-__pycache__
-.pytest_cache
-.coverage
-htmlcov
-data
-uploads
-.git
-.env
-.env.*
-output
-*.log
+*
+!target/*-runner
+!target/*-runner.jar
+!target/lib/*
+!target/quarkus-app/*
