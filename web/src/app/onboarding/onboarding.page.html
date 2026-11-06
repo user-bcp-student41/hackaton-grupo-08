@@ -1,0 +1,108 @@
+<main class="onboarding">
+  <h1>Activa tu wallet</h1>
+
+  @if (loading()) {
+    <p role="status">Cargando tu onboarding…</p>
+  }
+
+  @if (banner(); as message) {
+    <div class="banner" role="alert" data-testid="banner">{{ message }}</div>
+  }
+
+  @if (session(); as current) {
+    <nav aria-label="Pasos del onboarding">
+      <ol class="steps" data-testid="step-list">
+        @for (step of current.steps; track step.stepCode) {
+          <li
+            class="step"
+            [class.step--current]="step.status === 'IN_PROGRESS'"
+            [class.step--done]="step.status === 'COMPLETED'"
+            [attr.aria-current]="step.status === 'IN_PROGRESS' ? 'step' : null"
+            [attr.data-status]="step.status"
+          >
+            <span class="step__number">{{ step.order }}</span>
+            <span class="step__title">{{ stepTitle(step.stepCode) }}</span>
+            <span class="step__state">
+              @switch (step.status) {
+                @case ('COMPLETED') { Completado }
+                @case ('IN_PROGRESS') { Paso actual }
+                @default { Pendiente }
+              }
+            </span>
+          </li>
+        }
+      </ol>
+    </nav>
+
+    @if (readyToComplete()) {
+      <section class="panel" data-testid="finish-panel">
+        <h2>Todo listo</h2>
+        <p>Completaste los {{ totalSteps() }} pasos. Finaliza para activar tu wallet.</p>
+        <button type="button" (click)="finish()" [disabled]="submitting()">
+          {{ submitting() ? 'Activando…' : 'Finalizar y activar wallet' }}
+        </button>
+      </section>
+    } @else if (presentation(); as step) {
+      <form class="panel" (submit)="$event.preventDefault(); submitStep()" novalidate>
+        <h2>Paso {{ currentPosition() }} de {{ totalSteps() }}: {{ step.title }}</h2>
+        <p>{{ step.description }}</p>
+
+        @for (field of step.fields; track field.name) {
+          <div class="field" [class.field--error]="errorFor(field)">
+            <label [for]="'field-' + field.name">
+              {{ field.label }}@if (field.required) { <span aria-hidden="true"> *</span> }
+            </label>
+            @if (field.type === 'select') {
+              <select
+                [id]="'field-' + field.name"
+                [attr.aria-invalid]="errorFor(field) ? 'true' : null"
+                [attr.aria-describedby]="'hint-' + field.name"
+                (change)="onInput(field, $event)"
+              >
+                @if (field.initialValue === '') {
+                  <option value="" [selected]="valueOf(field) === ''">Selecciona una opción</option>
+                }
+                @for (option of field.options; track option.value) {
+                  <option [value]="option.value" [selected]="valueOf(field) === option.value">
+                    {{ option.label }}
+                  </option>
+                }
+              </select>
+            } @else {
+              <input
+                type="text"
+                autocomplete="off"
+                [id]="'field-' + field.name"
+                [value]="valueOf(field)"
+                [attr.aria-invalid]="errorFor(field) ? 'true' : null"
+                [attr.aria-describedby]="'hint-' + field.name"
+                (input)="onInput(field, $event)"
+              />
+            }
+            <small [id]="'hint-' + field.name" class="hint">{{ field.hint }}</small>
+            @if (errorFor(field); as fieldError) {
+              <p class="error" role="alert" [attr.data-testid]="'error-' + field.name">
+                {{ fieldError.message }} <strong>{{ fieldError.howToFix }}</strong>
+              </p>
+            }
+          </div>
+        }
+
+        @if (generalErrors().length > 0) {
+          <ul class="error-list" role="alert">
+            @for (item of generalErrors(); track $index) {
+              <li>{{ item.message }} {{ item.howToFix }}</li>
+            }
+          </ul>
+        }
+
+        <button type="submit" [disabled]="!canContinue()" data-testid="continue">
+          {{ submitting() ? 'Validando…' : 'Continuar' }}
+        </button>
+        @if (hasBlockingErrors()) {
+          <p class="hint">Corrige los datos marcados para poder continuar.</p>
+        }
+      </form>
+    }
+  }
+</main>
