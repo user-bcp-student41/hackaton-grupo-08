@@ -62,6 +62,16 @@ class PaymentResourceTest {
     }
 
     @Test
+    void validateResolvesDemoContactsByTheirFixedName() {
+        String user = activeUser();
+        given().header("X-User-Id", user).contentType(ContentType.JSON).body(body("77777777", "20.00"))
+                .when().post(PAYMENTS + "/validate").then()
+                .statusCode(200)
+                .body("recipient.displayName", equalTo("Valeria Quispe"))
+                .body("recipient.maskedAlias", equalTo("***777"));
+    }
+
+    @Test
     void validateShowsRecipientAndAmountWithoutCreatingAnyPayment() {
         String user = activeUser();
         given().header("X-User-Id", user).contentType(ContentType.JSON).body(body("contacto-123", "50.00"))

@@ -6,6 +6,7 @@ import { vi } from 'vitest';
 import { CollectionMovementsPage } from './collection/collection-movements.page';
 import { HomePage } from './home/home.page';
 import { MorePage } from './more/more.page';
+import { PaymentFormComponent } from './payments/payment-form.component';
 import { PaymentsHistoryPage } from './payments/payments-history.page';
 
 function setup<T>(component: new () => T) {
@@ -59,6 +60,65 @@ describe('MorePage (demo)', () => {
     root.querySelector<HTMLButtonElement>('[data-testid="logout"]')!.click();
     http.expectOne('/api/v1/auth/logout').flush(null, { status: 204, statusText: 'No Content' });
     expect(navigate).toHaveBeenCalledWith('/login');
+  });
+});
+
+describe('PaymentFormComponent recipient autocomplete', () => {
+  function form() {
+    const ctx = setup(PaymentFormComponent);
+    ctx.http.expectOne('/api/v1/checkout-events').flush(null);
+    const input = ctx.root.querySelector<HTMLInputElement>('input[name="recipientRef"]')!;
+    return { ...ctx, input };
+  }
+
+  it('offers the 10 demo contacts when the field is focused', () => {
+    const { fixture, root, input } = form();
+    input.dispatchEvent(new Event('focus'));
+    fixture.detectChanges();
+    const options = root.querySelectorAll('[role="option"]');
+    expect(options.length).toBe(10);
+    expect(root.textContent).toContain('Valeria Quispe');
+    expect(root.textContent).toContain('77777777');
+    expect(input.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('filters by number or by name ignoring accents', () => {
+    const { fixture, root, input } = form();
+    input.value = 'lucia';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(root.querySelectorAll('[role="option"]').length).toBe(1);
+    expect(root.querySelector('[role="option"]')?.textContent).toContain('Lucía Fernández');
+
+    input.value = '7777';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(root.querySelector('[role="option"]')?.textContent).toContain('77777777');
+  });
+
+  it('fills the number and confirms the contact name when one is picked', () => {
+    const { fixture, root, input } = form();
+    input.dispatchEvent(new Event('focus'));
+    fixture.detectChanges();
+    root.querySelectorAll<HTMLElement>('[role="option"]')[1].click();
+    fixture.detectChanges();
+    expect(input.value).toBe('66666666');
+    expect(root.querySelector('[data-testid="selected-contact"]')?.textContent).toContain('Diego Ramírez');
+    expect(root.querySelector('[role="listbox"]')).toBeNull();
+  });
+
+  it('supports keyboard selection and still accepts free text', () => {
+    const { fixture, root, input } = form();
+    input.dispatchEvent(new Event('focus'));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+    fixture.detectChanges();
+    expect(input.value).toBe('77777777');
+
+    input.value = 'mock-success';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(root.querySelector('[data-testid="selected-contact"]')).toBeNull();
   });
 });
 

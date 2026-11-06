@@ -26,6 +26,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  * </ul>
  *
  * Todo importe/destinatario es sintético. Contadores en memoria (NO durables).
+ *
+ * <p>Además, el mock tiene un directorio fijo de contactos de demostración (números de 8 dígitos con nombre);
+ * cualquier otra referencia se resuelve como "Contacto de prueba". La interfaz web sugiere esta misma lista.
  */
 @ApplicationScoped
 public class InProcessMockPaymentProvider implements PaymentProvider {
@@ -40,6 +43,20 @@ public class InProcessMockPaymentProvider implements PaymentProvider {
     public static final String UNAVAILABLE = "mock-unavailable";
     public static final String LATE_SUCCESS = "mock-late-success";
 
+    static final String DEFAULT_RECIPIENT_NAME = "Contacto de prueba";
+
+    static final Map<String, String> DEMO_CONTACTS = Map.ofEntries(
+            Map.entry("77777777", "Valeria Quispe"),
+            Map.entry("66666666", "Diego Ramírez"),
+            Map.entry("55555555", "Camila Torres"),
+            Map.entry("44444444", "Mateo Salazar"),
+            Map.entry("33333333", "Lucía Fernández"),
+            Map.entry("22222222", "Sebastián Rojas"),
+            Map.entry("11111111", "Andrea Paredes"),
+            Map.entry("88888888", "Joaquín Huamán"),
+            Map.entry("99999999", "Fernanda Castillo"),
+            Map.entry("12121212", "Renzo Vargas"));
+
     private final Map<UUID, String> scenarioByPayment = new ConcurrentHashMap<>();
     private final Map<UUID, AtomicInteger> queries = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> submits = new ConcurrentHashMap<>();
@@ -52,7 +69,8 @@ public class InProcessMockPaymentProvider implements PaymentProvider {
         if (UNAVAILABLE.equals(recipientRef)) {
             throw new ProviderUnavailableException("Proveedor simulado no disponible");
         }
-        return Optional.of(new RecipientInfo("Contacto de prueba", mask(recipientRef)));
+        return Optional.of(new RecipientInfo(DEMO_CONTACTS.getOrDefault(recipientRef, DEFAULT_RECIPIENT_NAME),
+                mask(recipientRef)));
     }
 
     @Override

@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { money } from '../core/format';
 import { IconComponent } from '../core/ui/icon.component';
 import { GENERIC_ERROR, ERROR_MESSAGES } from './payment-labels';
+import { filterContacts, MockContact, MOCK_CONTACTS } from './mock-contacts';
 import { newIdempotencyKey, PaymentsApi } from './payments.api';
 import { ApiError, PaymentRequest, ValidationResult } from './payments.models';
 
@@ -27,11 +28,36 @@ type Step = 'capture' | 'review';
       <form (submit)="review($event)" novalidate data-testid="payment-capture">
         <div class="field">
           <label class="field__label" for="recipientRef">Destinatario</label>
-          <div class="control">
-            <span class="control__icon"><app-icon name="user" /></span>
-            <input id="recipientRef" name="recipientRef" autocomplete="off" placeholder="Alias o contacto"
-                   [value]="recipientRef()" (input)="recipientRef.set(value($event))" />
+          <div class="combo">
+            <div class="control">
+              <span class="control__icon"><app-icon name="user" /></span>
+              <input id="recipientRef" name="recipientRef" autocomplete="off" placeholder="Número o nombre del contacto"
+                     role="combobox" aria-autocomplete="list" aria-controls="recipient-list"
+                     [attr.aria-expanded]="listOpen()" [attr.aria-activedescendant]="activeId()"
+                     [value]="recipientRef()" (focus)="open.set(true)" (blur)="closeList()"
+                     (input)="onRecipient($event)" (keydown)="onKey($event)" />
+            </div>
+            @if (listOpen()) {
+              <ul id="recipient-list" class="suggest" role="listbox" aria-label="Contactos sugeridos">
+                @for (contact of suggestions(); track contact.ref; let i = $index) {
+                  <li role="option" class="suggest__item" [id]="'contact-' + contact.ref"
+                      [class.suggest__item--active]="i === activeIndex()" [attr.aria-selected]="i === activeIndex()"
+                      (mousedown)="$event.preventDefault()" (click)="pick(contact)">
+                    <span class="tile tile--blue" aria-hidden="true"><app-icon name="user" /></span>
+                    <span class="suggest__text">
+                      <strong>{{ contact.name }}</strong>
+                      <small>{{ contact.ref }}</small>
+                    </span>
+                  </li>
+                }
+              </ul>
+            }
           </div>
+          @if (selectedContact(); as contact) {
+            <p class="picked" data-testid="selected-contact">
+              <app-icon name="check" /><span>{{ contact.name }} · {{ contact.ref }}</span>
+            </p>
+          }
         </div>
         <div class="field">
           <label class="field__label" for="amount">Importe (S/)</label>
@@ -85,6 +111,54 @@ type Step = 'capture' | 'review';
   styles: `
     .prefix {
       font-weight: 800;
+    }
+    .combo {
+      position: relative;
+    }
+    .suggest {
+      position: absolute;
+      top: calc(100% + 0.25rem);
+      right: 0;
+      left: 0;
+      z-index: 10;
+      max-height: 15rem;
+      margin: 0;
+      padding: 0.25rem;
+      overflow-y: auto;
+      border: 1px solid var(--brand-border);
+      border-radius: 0.85rem;
+      background: #fff;
+      box-shadow: 0 8px 24px rgb(11 42 138 / 18%);
+      list-style: none;
+    }
+    .suggest__item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      min-height: 3rem;
+      padding: 0.4rem 0.5rem;
+      border-radius: 0.65rem;
+      cursor: pointer;
+    }
+    .suggest__item:hover,
+    .suggest__item--active {
+      background: var(--brand-background);
+    }
+    .suggest__text {
+      display: flex;
+      flex-direction: column;
+    }
+    .suggest__text small {
+      color: var(--brand-muted);
+    }
+    .picked {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin: 0.5rem 0 0;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--brand-success);
     }
     .who {
       display: flex;
@@ -155,6 +229,17 @@ export class PaymentFormComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly review_ = signal<ValidationResult | null>(null);
   protected readonly quickAmounts = [10, 20, 50];
+  protected readonly open = signal(false);
+  protected readonly activeIndex = signal(-1);
+  protected readonly suggestions = computed(() => filterContacts(this.recipientRef()));
+  protected readonly listOpen = computed(() => this.open() && this.suggestions().length > 0);
+  protected readonly activeId = computed(() => {
+    const index = this.activeIndex();
+    return this.listOpen() && index >= 0 ? `contact-${this.suggestions()[index].ref}` : null;
+  });
+  protected readonly selectedContact = computed<MockContact | null>(
+    () => MOCK_CONTACTS.find((contact) => contact.ref === this.recipientRef().trim()) ?? null,
+  );
   protected readonly amountLabel = computed(() => {
     const result = this.review_();
     return result ? money(result.amount, result.currency) : '';
@@ -169,6 +254,46 @@ export class PaymentFormComponent implements OnInit {
 
   protected value(event: Event): string {
     return (event.target as HTMLInputElement).value;
+  }
+
+  protected onRecipient(event: Event): void {
+    this.recipientRef.set(this.value(event));
+    this.activeIndex.set(-1);
+    this.open.set(true);
+  }
+
+  protected onKey(event: KeyboardEvent): void {
+    const options = this.suggestions();
+    switch (event.key) {
+      case 'ArrowDown':
+        event.preventDefault();
+        this.open.set(true);
+        this.activeIndex.update((index) => Math.min(index + 1, options.length - 1));
+        break;
+      case 'ArrowUp':
+        event.preventDefault();
+        this.activeIndex.update((index) => Math.max(index - 1, -1));
+        break;
+      case 'Enter':
+        if (this.listOpen() && this.activeIndex() >= 0) {
+          event.preventDefault();
+          this.pick(options[this.activeIndex()]);
+        }
+        break;
+      case 'Escape':
+        this.closeList();
+        break;
+    }
+  }
+
+  protected pick(contact: MockContact): void {
+    this.recipientRef.set(contact.ref);
+    this.closeList();
+  }
+
+  protected closeList(): void {
+    this.open.set(false);
+    this.activeIndex.set(-1);
   }
 
   protected review(event: Event): void {
