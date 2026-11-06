@@ -4,6 +4,7 @@ import com.ailabs.onboarding.domain.OnboardingSession;
 import com.ailabs.onboarding.service.CompletionResult;
 import com.ailabs.onboarding.service.OnboardingService;
 import com.ailabs.onboarding.service.StartResult;
+import com.ailabs.registration.AuthenticatedUserResolver;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
@@ -29,32 +30,37 @@ public class OnboardingResource {
     @Inject
     OnboardingService service;
 
+    @Inject
+    AuthenticatedUserResolver resolver;
+
     @ConfigProperty(name = "onboarding.payments-entry-point", defaultValue = "/payments/new")
     String paymentsEntryPoint;
 
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
-    public Response start(@HeaderParam(UserIdResolver.HEADER) String userHeader, StartSessionRequest body) {
-        String userId = UserIdResolver.resolve(userHeader);
+    public Response start(@HeaderParam("Authorization") String authorization,
+            @HeaderParam(UserIdResolver.HEADER) String userHeader, StartSessionRequest body) {
+        String userId = resolver.resolve(authorization, userHeader);
         StartResult result = service.start(userId, body == null ? null : body.acquisitionSource());
         return Response.status(result.created() ? 201 : 200).entity(SessionResponse.from(result.session())).build();
     }
 
     @GET
     @Path("/{sessionId}")
-    public SessionResponse get(@HeaderParam(UserIdResolver.HEADER) String userHeader,
-            @PathParam("sessionId") String sessionId) {
-        String userId = UserIdResolver.resolve(userHeader);
+    public SessionResponse get(@HeaderParam("Authorization") String authorization,
+            @HeaderParam(UserIdResolver.HEADER) String userHeader, @PathParam("sessionId") String sessionId) {
+        String userId = resolver.resolve(authorization, userHeader);
         return SessionResponse.from(service.get(userId, parseSessionId(sessionId)));
     }
 
     @PUT
     @Path("/{sessionId}/steps/{stepCode}")
     @Consumes(MediaType.APPLICATION_JSON)
-    public SessionResponse submitStep(@HeaderParam(UserIdResolver.HEADER) String userHeader,
+    public SessionResponse submitStep(@HeaderParam("Authorization") String authorization,
+            @HeaderParam(UserIdResolver.HEADER) String userHeader,
             @PathParam("sessionId") String sessionId, @PathParam("stepCode") String stepCode,
             StepSubmissionRequest body) {
-        String userId = UserIdResolver.resolve(userHeader);
+        String userId = resolver.resolve(authorization, userHeader);
         UUID id = parseSessionId(sessionId);
         if (body == null || body.data() == null) {
             throw ApiException.badRequest("Envía los datos del paso en el campo data.");
@@ -69,9 +75,9 @@ public class OnboardingResource {
 
     @POST
     @Path("/{sessionId}/complete")
-    public CompleteResponse complete(@HeaderParam(UserIdResolver.HEADER) String userHeader,
-            @PathParam("sessionId") String sessionId) {
-        String userId = UserIdResolver.resolve(userHeader);
+    public CompleteResponse complete(@HeaderParam("Authorization") String authorization,
+            @HeaderParam(UserIdResolver.HEADER) String userHeader, @PathParam("sessionId") String sessionId) {
+        String userId = resolver.resolve(authorization, userHeader);
         CompletionResult result = service.complete(userId, parseSessionId(sessionId));
         return new CompleteResponse(result.session().id(), result.session().status().name(),
                 result.session().completedAt(), WalletResponse.from(result.wallet()), paymentsEntryPoint);

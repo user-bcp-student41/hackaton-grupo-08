@@ -18,6 +18,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -50,6 +51,9 @@ public class RegistrationService {
     int maxAttempts;
     @ConfigProperty(name = "registration.otp.max-resends")
     int maxResends;
+    /** Solo para desarrollo sin servicio de correo: si está definido, todos los OTP emitidos son este valor. */
+    @ConfigProperty(name = "registration.otp.fixed-code")
+    Optional<String> fixedCode;
     @ConfigProperty(name = "onboarding.payments-entry-point", defaultValue = "/payments/new")
     String paymentsEntryPoint;
 
@@ -198,6 +202,9 @@ public class RegistrationService {
     }
 
     private String newCode() {
+        if (fixedCode.isPresent() && !fixedCode.get().isBlank()) {
+            return fixedCode.get().trim();
+        }
         StringBuilder sb = new StringBuilder(otpLength);
         for (int i = 0; i < otpLength; i++) {
             sb.append(random.nextInt(10));

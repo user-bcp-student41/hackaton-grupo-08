@@ -140,6 +140,25 @@ class RegistrationFlowTest {
     }
 
     @Test
+    void sessionTokenAuthenticatesPaymentEndpoints() {
+        String doc = newDoc();
+        String email = "p" + doc + "@example.com";
+        String id = register(doc, email).path("registrationId");
+        given().contentType(ContentType.JSON).body("{\"otp\":\"" + mailbox.lastCode(email).orElseThrow() + "\"}")
+                .post("/api/v1/registrations/" + id + "/otp/verify").then().statusCode(200);
+        String token = login("DNI", doc, "123456").then().statusCode(200).extract().path("accessToken");
+
+        given().header("Authorization", "Bearer " + token).contentType(ContentType.JSON)
+                .body("{\"eventType\":\"CHECKOUT_CONFIRMATION_VIEWED\"}").post("/api/v1/checkout-events")
+                .then().statusCode(202);
+        given().header("Authorization", "Bearer " + token).get("/api/v1/payments").then().statusCode(200);
+
+        given().contentType(ContentType.JSON).body("{\"eventType\":\"CHECKOUT_CONFIRMATION_VIEWED\"}")
+                .post("/api/v1/checkout-events").then().statusCode(401);
+        given().header("Authorization", "Bearer token-invalido").get("/api/v1/payments").then().statusCode(401);
+    }
+
+    @Test
     void messagesDoNotMentionTestEnvironment() {
         String text = given().contentType(ContentType.JSON).body(body("XX", "abc", "x", "1"))
                 .post("/api/v1/registrations").then().statusCode(422).extract().asString().toLowerCase();

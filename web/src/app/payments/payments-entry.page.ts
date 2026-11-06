@@ -1,47 +1,44 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { OnboardingApi } from '../onboarding/onboarding.api';
+import { IconComponent } from '../core/ui/icon.component';
+import { ScreenComponent } from '../core/ui/screen.component';
 import { PaymentFormComponent } from './payment-form.component';
 
 type AccessState = 'checking' | 'allowed' | 'blocked' | 'error';
 
 /**
- * Marcador del punto de entrada de pagos de bajo monto. El flujo de pago pertenece a HU-02: esta pantalla solo
- * confirma, consultando la API, que la wallet está ACTIVE y dirige al onboarding si no lo está.
+ * Punto de entrada de pagos de bajo monto. Confirma, consultando la API, que la wallet está ACTIVE antes de
+ * mostrar el formulario; si no lo está, dirige al registro.
  */
 @Component({
   selector: 'app-payments-entry-page',
-  imports: [RouterLink, PaymentFormComponent],
+  imports: [RouterLink, PaymentFormComponent, ScreenComponent, IconComponent],
   template: `
-    <main class="payments">
-      <h1>Pagos de bajo monto</h1>
+    <app-screen title="Pagar" backLink="/home" [showNav]="false">
       @switch (state()) {
         @case ('checking') {
-          <p role="status">Verificando el estado de tu wallet…</p>
+          <p class="lead" role="status">Verificando el estado de tu billetera…</p>
         }
         @case ('allowed') {
           <app-payment-form />
-          <p><a routerLink="/payments">Ver historial</a></p>
+          <p class="link-row"><a routerLink="/payments">Ver mis movimientos</a></p>
         }
         @case ('blocked') {
-          <p data-testid="payments-blocked">
-            Tu wallet aún no está activa. Completa tu registro para pagar.
-            <a routerLink="/register">Ir al registro</a>
-          </p>
+          <div class="panel panel--soft" data-testid="payments-blocked">
+            <h2 class="heading">Activa tu billetera</h2>
+            <p class="lead">Tu billetera aún no está activa. Completa tu registro para pagar.</p>
+            <a class="btn" routerLink="/register">Ir al registro</a>
+          </div>
         }
         @default {
-          <p role="alert">No pudimos verificar tu wallet. Inténtalo de nuevo en unos minutos.</p>
+          <p class="alert" role="alert">
+            <app-icon name="alert" />
+            <span>No pudimos verificar tu billetera. Inténtalo de nuevo en unos minutos.</span>
+          </p>
         }
       }
-    </main>
-  `,
-  styles: `
-    .payments {
-      max-width: 40rem;
-      margin: 0 auto;
-      padding: 1.5rem 1rem;
-      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-    }
+    </app-screen>
   `,
 })
 export class PaymentsEntryPage implements OnInit {

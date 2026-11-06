@@ -1,5 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { money } from '../core/format';
+import { IconComponent } from '../core/ui/icon.component';
 import { GENERIC_ERROR, ERROR_MESSAGES } from './payment-labels';
 import { newIdempotencyKey, PaymentsApi } from './payments.api';
 import { ApiError, PaymentRequest, ValidationResult } from './payments.models';
@@ -17,39 +19,128 @@ type Step = 'capture' | 'review';
  */
 @Component({
   selector: 'app-payment-form',
+  imports: [IconComponent],
   template: `
     @if (step() === 'capture') {
+      <h2 class="heading">¿A quién le pagas?</h2>
+      <p class="lead">Ingresa el contacto y el importe. Podrás revisar todo antes de confirmar.</p>
       <form (submit)="review($event)" novalidate data-testid="payment-capture">
-        <label>
-          Destinatario
-          <input name="recipientRef" [value]="recipientRef()" (input)="recipientRef.set(value($event))" />
-        </label>
-        <label>
-          Importe (PEN)
-          <input name="amount" inputmode="decimal" [value]="amountText()" (input)="amountText.set(value($event))" />
-        </label>
+        <div class="field">
+          <label class="field__label" for="recipientRef">Destinatario</label>
+          <div class="control">
+            <span class="control__icon"><app-icon name="user" /></span>
+            <input id="recipientRef" name="recipientRef" autocomplete="off" placeholder="Alias o contacto"
+                   [value]="recipientRef()" (input)="recipientRef.set(value($event))" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="field__label" for="amount">Importe (S/)</label>
+          <div class="control">
+            <span class="control__icon prefix">S/</span>
+            <input id="amount" name="amount" inputmode="decimal" autocomplete="off" placeholder="0.00"
+                   [value]="amountText()" (input)="amountText.set(value($event))" />
+          </div>
+        </div>
+        <div class="chips" aria-label="Importes rápidos">
+          @for (quick of quickAmounts; track quick) {
+            <button type="button" class="chip" (click)="amountText.set(quick.toString())">S/ {{ quick }}</button>
+          }
+        </div>
         @if (error()) {
-          <p role="alert" data-testid="payment-error">{{ error() }}</p>
+          <p class="alert" role="alert" data-testid="payment-error">
+            <app-icon name="alert" /><span>{{ error() }}</span>
+          </p>
         }
-        <button type="submit" [disabled]="busy()">Revisar pago</button>
+        <button class="btn btn--navy" type="submit" [disabled]="busy()">
+          {{ busy() ? 'Validando…' : 'Revisar pago' }}
+        </button>
       </form>
     } @else {
       <section data-testid="payment-review" aria-label="Confirmar pago">
-        <h2>Confirma tu pago</h2>
-        <dl>
-          <dt>Destinatario</dt>
-          <dd data-testid="review-recipient">
+        <div class="who">
+          <span class="who__avatar" aria-hidden="true"><app-icon name="user" /></span>
+          <strong class="who__name" data-testid="review-recipient">
             {{ review_()?.recipient?.displayName }} ({{ review_()?.recipient?.maskedAlias }})
-          </dd>
-          <dt>Importe</dt>
-          <dd data-testid="review-amount">{{ review_()?.currency }} {{ formattedAmount() }}</dd>
-        </dl>
+          </strong>
+        </div>
+        <div class="amount">
+          <span class="amount__label">Importe a pagar</span>
+          <strong class="amount__value" data-testid="review-amount">{{ amountLabel() }}</strong>
+        </div>
+        <p class="note"><app-icon name="alert" /><span>Revisa los datos antes de confirmar el pago.</span></p>
         @if (error()) {
-          <p role="alert" data-testid="payment-error">{{ error() }}</p>
+          <p class="alert" role="alert" data-testid="payment-error">
+            <app-icon name="alert" /><span>{{ error() }}</span>
+          </p>
         }
-        <button type="button" data-testid="confirm" [disabled]="busy()" (click)="confirm()">Confirmar</button>
-        <button type="button" [disabled]="busy()" (click)="edit()">Editar</button>
+        <div class="stack">
+          <button type="button" class="btn" data-testid="confirm" [disabled]="busy()" (click)="confirm()">
+            {{ busy() ? 'Procesando…' : 'Confirmar pago' }}
+          </button>
+          <button type="button" class="btn btn--outline" [disabled]="busy()" (click)="edit()">Volver a editar</button>
+        </div>
       </section>
+    }
+  `,
+  styles: `
+    .prefix {
+      font-weight: 800;
+    }
+    .who {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 1rem;
+      border-radius: 1rem;
+      background: var(--brand-background);
+      text-align: center;
+    }
+    .who__avatar {
+      display: grid;
+      place-items: center;
+      width: 3.5rem;
+      height: 3.5rem;
+      border-radius: 50%;
+      background: #fff;
+      color: var(--brand-primary);
+    }
+    .who__avatar app-icon {
+      width: 1.75rem;
+      height: 1.75rem;
+    }
+    .who__name {
+      color: var(--brand-primary);
+      font-size: 1.05rem;
+    }
+    .amount {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      margin: 1.25rem 0;
+      text-align: center;
+    }
+    .amount__label {
+      font-size: 0.85rem;
+      color: var(--brand-muted);
+    }
+    .amount__value {
+      font-size: 2.25rem;
+      color: var(--brand-primary);
+    }
+    .note {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin: 0 0 1.25rem;
+      padding: 0.7rem 0.85rem;
+      border-radius: 0.75rem;
+      background: var(--brand-background);
+      color: var(--brand-primary);
+      font-size: 0.875rem;
+    }
+    .note app-icon {
+      flex: none;
     }
   `,
 })
@@ -63,9 +154,10 @@ export class PaymentFormComponent implements OnInit {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly review_ = signal<ValidationResult | null>(null);
-  protected readonly formattedAmount = computed(() => {
-    const amount = this.review_()?.amount;
-    return amount === undefined ? '' : amount.toFixed(2);
+  protected readonly quickAmounts = [10, 20, 50];
+  protected readonly amountLabel = computed(() => {
+    const result = this.review_();
+    return result ? money(result.amount, result.currency) : '';
   });
 
   private request: PaymentRequest | null = null;

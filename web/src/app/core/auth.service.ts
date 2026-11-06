@@ -33,6 +33,7 @@ export interface LoginView {
 }
 
 const TOKEN_KEY = 'wallet.accessToken';
+const DOCUMENT_KEY = 'wallet.documentNumber';
 
 /** Registro, OTP, login y logout. El token vive solo en sessionStorage (se descarta al cerrar la pestaña). */
 @Injectable({ providedIn: 'root' })
@@ -64,7 +65,21 @@ export class AuthService {
   }
 
   login(body: { documentType: DocumentType; documentNumber: string; password: string }): Observable<LoginView> {
-    return this.http.post<LoginView>('/api/v1/auth/login', body).pipe(tap((r) => this.store(r.accessToken)));
+    return this.http.post<LoginView>('/api/v1/auth/login', body).pipe(
+      tap((r) => {
+        this.store(r.accessToken);
+        this.remember(DOCUMENT_KEY, body.documentNumber);
+      }),
+    );
+  }
+
+  /** Documento con el que se inició sesión (solo para mostrarlo en el perfil). */
+  documentNumber(): string | null {
+    try {
+      return sessionStorage.getItem(DOCUMENT_KEY);
+    } catch {
+      return null;
+    }
   }
 
   /** Invalida la sesión en servidor y descarta el token local (también si el servidor falla). */
@@ -75,10 +90,19 @@ export class AuthService {
   clear(): void {
     try {
       sessionStorage.removeItem(TOKEN_KEY);
+      sessionStorage.removeItem(DOCUMENT_KEY);
     } catch {
       // sin almacenamiento
     }
     this.tokenSignal.set(null);
+  }
+
+  private remember(key: string, value: string): void {
+    try {
+      sessionStorage.setItem(key, value);
+    } catch {
+      // sin almacenamiento: el dato solo es informativo
+    }
   }
 
   private store(token: string): void {

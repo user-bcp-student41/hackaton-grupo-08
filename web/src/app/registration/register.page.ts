@@ -3,84 +3,197 @@ import { Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ApiErrorBody, AuthService, DocumentType } from '../core/auth.service';
 import { DOCUMENT_LENGTH, EMAIL_PATTERN, OTP_LENGTH, PASSWORD_LENGTH, digitsOnly, documentError, passwordError } from '../core/digits';
+import { AuthShellComponent } from '../core/ui/auth-shell.component';
+import { IconComponent } from '../core/ui/icon.component';
 
-/** Registro en 2 pasos (HU-01): datos y código OTP enviado al correo. */
+/** Registro en 2 pasos (HU-01): datos y código OTP enviado al correo; termina con la billetera activa. */
 @Component({
   selector: 'app-register-page',
-  imports: [RouterLink],
+  imports: [RouterLink, AuthShellComponent, IconComponent],
   template: `
-    <main class="card">
-      <h1>Crea tu cuenta</h1>
-      <ol class="steps" aria-label="Pasos del registro">
-        @for (item of stepLabels; track item.n) {
-          <li [class.active]="step() === item.n" [attr.aria-current]="step() === item.n ? 'step' : null">
-            {{ item.n }}. {{ item.label }}
-          </li>
-        }
-      </ol>
-      <p data-testid="step-indicator" role="status">Paso {{ step() }} de 2</p>
-
-      @if (step() === 1) {
-        <form (submit)="submitData($event)" novalidate>
-          <div class="field">
-            <label for="docType">Tipo de documento</label>
-            <select id="docType" [value]="documentType()" (change)="documentType.set(asType($event))">
-              <option value="DNI">DNI</option>
-              <option value="CE">CE</option>
-            </select>
-            @if (err('documentType')) { <span class="field-error">{{ err('documentType') }}</span> }
-          </div>
-          <div class="field">
-            <label for="docNumber">Número de documento</label>
-            <input id="docNumber" type="text" inputmode="numeric" autocomplete="off"
-                   [attr.maxlength]="docLen" [value]="documentNumber()" (input)="onDocument($event)" />
-            @if (err('documentNumber')) { <span class="field-error">{{ err('documentNumber') }}</span> }
-          </div>
-          <div class="field">
-            <label for="email">Correo electrónico</label>
-            <input id="email" type="email" autocomplete="email" [value]="email()" (input)="email.set(val($event))" />
-            @if (err('email')) { <span class="field-error">{{ err('email') }}</span> }
-          </div>
-          <div class="field">
-            <label for="password">Contraseña de 6 dígitos</label>
-            <input id="password" [type]="showPassword() ? 'text' : 'password'" inputmode="numeric"
-                   autocomplete="new-password" [attr.maxlength]="pwdLen" [value]="password()"
-                   (input)="onPassword($event)" />
-            <button type="button" class="btn-link" (click)="showPassword.set(!showPassword())">
-              {{ showPassword() ? 'Ocultar' : 'Mostrar' }} contraseña
-            </button>
-            @if (err('password')) { <span class="field-error">{{ err('password') }}</span> }
-          </div>
-          @if (formError()) { <p role="alert" class="field-error">{{ formError() }}</p> }
-          <button class="btn" type="submit" [disabled]="busy()">Continuar</button>
-        </form>
-        <p>¿Ya tienes cuenta? <a routerLink="/login">Inicia sesión</a></p>
-      } @else if (step() === 2) {
-        <form (submit)="submitOtp($event)" novalidate>
-          <p>Enviamos un código a tu correo. Ingrésalo para activar tu wallet.</p>
-          <p class="hint">Si necesitas corregir tus datos, inicia un nuevo registro.</p>
-          <div class="field">
-            <label for="otp">Código de verificación</label>
-            <input id="otp" type="text" inputmode="numeric" autocomplete="one-time-code"
-                   [attr.maxlength]="otpLen" [value]="otp()" (input)="otp.set(digits($event, otpLen))" />
-          </div>
-          @if (formError()) { <p role="alert" class="field-error">{{ formError() }}</p> }
-          @if (info()) { <p role="status">{{ info() }}</p> }
-          <button class="btn" type="submit" [disabled]="busy()">Validar código</button>
-          <button class="btn-link" type="button" [disabled]="busy()" (click)="resend()">Reenviar código</button>
-        </form>
-      } @else {
-        <section data-testid="registration-done">
-          <p role="status">¡Listo! Validamos tu correo y tu wallet está activa.</p>
+    @if (step() === 3) {
+      <app-auth-shell>
+        <section class="done" data-testid="registration-done">
+          <span class="done__badge" aria-hidden="true">
+            <app-icon name="check" />
+            <i class="done__spark done__spark--a"></i>
+            <i class="done__spark done__spark--b"></i>
+          </span>
+          <h1 class="heading">Tu billetera está activa</h1>
+          <p class="lead" role="status">
+            ¡Listo! Validamos tu correo. Inicia sesión para realizar pagos y transferencias de forma rápida y segura.
+          </p>
           <a class="btn" routerLink="/login">Iniciar sesión</a>
         </section>
-      }
-    </main>
+      </app-auth-shell>
+    } @else {
+      <app-auth-shell variant="bar" title="Activar mi billetera" [backLink]="step() === 1 ? '/login' : null"
+                      [backButton]="step() === 2" (backClick)="backToData()">
+        <div class="progress">
+          <p class="progress__caption" data-testid="step-indicator" role="status">Paso {{ step() }} de 2</p>
+          <div class="progress__track" role="progressbar" aria-label="Avance del registro" aria-valuemin="0"
+               aria-valuemax="2" [attr.aria-valuenow]="step()">
+            <div class="progress__bar" [style.width.%]="step() * 50"></div>
+          </div>
+        </div>
+
+        @if (step() === 1) {
+          <h2 class="heading">Completa tus datos</h2>
+          <p class="lead">Ingresa la información solicitada para continuar.</p>
+          <form (submit)="submitData($event)" novalidate>
+            <div class="field">
+              <label class="field__label" for="docType">Tipo de documento</label>
+              <div class="control" [class.control--error]="err('documentType')">
+                <select id="docType" [value]="documentType()" (change)="documentType.set(asType($event))">
+                  <option value="DNI">DNI</option>
+                  <option value="CE">CE</option>
+                </select>
+                <span class="control__icon"><app-icon name="chevron-down" /></span>
+              </div>
+              @if (err('documentType')) {
+                <p class="field-error" role="alert"><app-icon name="alert" /><span>{{ err('documentType') }}</span></p>
+              }
+            </div>
+            <div class="field">
+              <label class="field__label" for="docNumber">Número de documento</label>
+              <div class="control" [class.control--error]="err('documentNumber')">
+                <span class="control__icon"><app-icon name="user" /></span>
+                <input id="docNumber" type="text" inputmode="numeric" autocomplete="off" placeholder="12345678"
+                       [attr.maxlength]="docLen" [value]="documentNumber()"
+                       [attr.aria-invalid]="err('documentNumber') ? 'true' : null"
+                       [attr.aria-describedby]="err('documentNumber') ? 'docNumber-error' : null"
+                       (input)="onDocument($event)" />
+              </div>
+              @if (err('documentNumber')) {
+                <p class="field-error" id="docNumber-error" role="alert">
+                  <app-icon name="alert" /><span>{{ err('documentNumber') }}</span>
+                </p>
+              }
+            </div>
+            <div class="field">
+              <label class="field__label" for="email">Correo electrónico</label>
+              <div class="control" [class.control--error]="err('email')">
+                <span class="control__icon"><app-icon name="mail" /></span>
+                <input id="email" type="email" inputmode="email" autocomplete="email" placeholder="nombre@correo.com"
+                       [value]="email()" [attr.aria-invalid]="err('email') ? 'true' : null"
+                       [attr.aria-describedby]="err('email') ? 'email-error' : null"
+                       (input)="email.set(val($event))" />
+              </div>
+              @if (err('email')) {
+                <p class="field-error" id="email-error" role="alert">
+                  <app-icon name="alert" /><span>{{ err('email') }}</span>
+                </p>
+              }
+            </div>
+            <div class="field">
+              <label class="field__label" for="password">Contraseña de 6 dígitos</label>
+              <div class="control" [class.control--error]="err('password')">
+                <span class="control__icon"><app-icon name="lock" /></span>
+                <input id="password" [type]="showPassword() ? 'text' : 'password'" inputmode="numeric"
+                       autocomplete="new-password" [attr.maxlength]="pwdLen" [value]="password()"
+                       [attr.aria-invalid]="err('password') ? 'true' : null"
+                       [attr.aria-describedby]="err('password') ? 'password-error' : null"
+                       (input)="onPassword($event)" />
+                <button type="button" class="control__action" (click)="showPassword.set(!showPassword())"
+                        [attr.aria-label]="showPassword() ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                        [attr.aria-pressed]="showPassword()">
+                  <app-icon [name]="showPassword() ? 'eye-off' : 'eye'" />
+                </button>
+              </div>
+              @if (err('password')) {
+                <p class="field-error" id="password-error" role="alert">
+                  <app-icon name="alert" /><span>{{ err('password') }}</span>
+                </p>
+              }
+            </div>
+            @if (formError()) {
+              <p role="alert" class="alert"><app-icon name="alert" /><span>{{ formError() }}</span></p>
+            }
+            <button class="btn btn--navy" type="submit" [disabled]="busy()">
+              {{ busy() ? 'Validando…' : 'Continuar' }}
+            </button>
+          </form>
+          <p class="link-row">¿Ya tienes cuenta? <a routerLink="/login">Inicia sesión</a></p>
+        } @else {
+          <h2 class="heading">Verifica tu correo</h2>
+          <p class="lead">
+            Enviamos un código de {{ otpLen }} dígitos a <strong class="email">{{ email() }}</strong>. Ingrésalo para
+            activar tu billetera.
+          </p>
+          <form (submit)="submitOtp($event)" novalidate>
+            <div class="field">
+              <label class="field__label" for="otp">Código de verificación</label>
+              <div class="control control--otp" [class.control--error]="formError()">
+                <input id="otp" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="••••••"
+                       [attr.maxlength]="otpLen" [value]="otp()" (input)="otp.set(digits($event, otpLen))" />
+              </div>
+            </div>
+            <p class="hint">¿Te equivocaste en algún dato? Vuelve atrás para corregirlo.</p>
+            @if (formError()) {
+              <p role="alert" class="alert"><app-icon name="alert" /><span>{{ formError() }}</span></p>
+            }
+            @if (info()) {
+              <p role="status" class="alert alert--success"><app-icon name="check" /><span>{{ info() }}</span></p>
+            }
+            <div class="stack">
+              <button class="btn btn--navy" type="submit" [disabled]="busy()">
+                {{ busy() ? 'Validando…' : 'Validar código' }}
+              </button>
+              <button class="btn-link" type="button" [disabled]="busy()" (click)="resend()">Reenviar código</button>
+            </div>
+          </form>
+        }
+      </app-auth-shell>
+    }
   `,
   styles: `
-    .steps { display: flex; gap: 1rem; list-style: none; padding: 0; color: #6b7280; }
-    .steps .active { color: var(--brand-accent); font-weight: 700; }
-    .hint { font-size: 0.875rem; color: #6b7280; }
+    .email {
+      overflow-wrap: anywhere;
+    }
+    .done {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      text-align: center;
+    }
+    .done .btn {
+      margin-top: 0.75rem;
+    }
+    .done__badge {
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 6.5rem;
+      height: 6.5rem;
+      margin: -4.5rem 0 1rem;
+      border: 0.4rem solid #fff;
+      border-radius: 50%;
+      background: var(--brand-success);
+      color: #fff;
+      box-shadow: 0 6px 18px rgb(30 142 78 / 35%);
+    }
+    .done__badge app-icon {
+      width: 3.25rem;
+      height: 3.25rem;
+    }
+    .done__spark {
+      position: absolute;
+      width: 0.3rem;
+      height: 1.1rem;
+      border-radius: 999px;
+      background: var(--brand-accent);
+    }
+    .done__spark--a {
+      top: -0.6rem;
+      right: 0.2rem;
+      transform: rotate(30deg);
+    }
+    .done__spark--b {
+      top: 0.2rem;
+      right: -0.9rem;
+      transform: rotate(75deg);
+    }
   `,
 })
 export class RegisterPage {
@@ -89,10 +202,6 @@ export class RegisterPage {
   protected readonly docLen = DOCUMENT_LENGTH;
   protected readonly pwdLen = PASSWORD_LENGTH;
   protected readonly otpLen = OTP_LENGTH;
-  protected readonly stepLabels = [
-    { n: 1, label: 'Tus datos' },
-    { n: 2, label: 'Código al correo' },
-  ];
 
   protected readonly step = signal<1 | 2 | 3>(1);
   protected readonly documentType = signal<DocumentType>('DNI');
@@ -127,6 +236,15 @@ export class RegisterPage {
   }
   protected onPassword(e: Event): void {
     this.password.set(this.digits(e, PASSWORD_LENGTH));
+  }
+
+  /** Vuelve a los datos para corregirlos; al reenviar se genera un registro y un código nuevos. */
+  protected backToData(): void {
+    this.otp.set('');
+    this.errors.set({});
+    this.formError.set('');
+    this.info.set('');
+    this.step.set(1);
   }
 
   protected submitData(event: Event): void {

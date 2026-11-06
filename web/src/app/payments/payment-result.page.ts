@@ -1,5 +1,8 @@
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { dateTimeLabel, money } from '../core/format';
+import { IconComponent } from '../core/ui/icon.component';
+import { ScreenComponent } from '../core/ui/screen.component';
 import { ERROR_MESSAGES, GENERIC_ERROR, PROVISIONAL_NOTICE, STATUS_LABELS } from './payment-labels';
 import { newIdempotencyKey, PaymentsApi } from './payments.api';
 import { ApiError, Payment } from './payments.models';
@@ -14,51 +17,148 @@ export const MAX_POLLS = 20;
  */
 @Component({
   selector: 'app-payment-result-page',
-  imports: [RouterLink],
+  imports: [RouterLink, ScreenComponent, IconComponent],
   template: `
-    <main class="payments">
-      <h1>Resultado del pago</h1>
+    <app-screen title="Resultado del pago" [showNav]="false">
       @if (payment(); as p) {
-        <dl>
-          <dt>Destinatario</dt>
-          <dd>{{ p.recipient.displayName }} ({{ p.recipient.maskedAlias }})</dd>
-          <dt>Importe</dt>
-          <dd>{{ p.currency }} {{ p.amount.toFixed(2) }}</dd>
-        </dl>
         @if (!p.terminal) {
-          <p role="status" data-testid="payment-pending">
-            {{ labels.PENDING }}… <small>{{ notice }}</small>
-          </p>
+          <section class="state" data-testid="payment-pending" role="status">
+            <span class="spinner" aria-hidden="true"></span>
+            <h2 class="heading">Estamos procesando tu pago</h2>
+            <p class="lead">Esto puede tomar unos segundos. Te informaremos el resultado.</p>
+            <span class="badge badge--warn"><app-icon name="clock" />{{ labels.PENDING }}</span>
+          </section>
           @if (gaveUp()) {
-            <p data-testid="payment-still-processing">
-              Sigue procesando. Puedes salir: consulta el resultado en tu historial.
+            <p class="note" data-testid="payment-still-processing">
+              Sigue procesando. Puedes salir: consulta el resultado en tus movimientos.
             </p>
           }
         } @else {
-          <p role="status" data-testid="payment-terminal" [attr.data-status]="p.status">
-            <strong>{{ labels[p.status] }}</strong> <small>{{ notice }}</small>
-          </p>
+          <section class="state state--{{ p.status }}" data-testid="payment-terminal" [attr.data-status]="p.status"
+                   role="status">
+            <span class="state__icon" aria-hidden="true">
+              <app-icon [name]="p.status === 'SUCCESS' ? 'check' : 'x'" />
+            </span>
+            <h2 class="heading">{{ headline(p) }}</h2>
+            <p class="lead">{{ message(p) }}</p>
+            <span class="badge" [class.badge--ok]="p.status === 'SUCCESS'"
+                  [class.badge--bad]="p.status !== 'SUCCESS'">{{ labels[p.status] }}</span>
+          </section>
+        }
+
+        <dl class="panel details">
+          <div class="kv"><dt>Destinatario</dt><dd>{{ p.recipient.displayName }} ({{ p.recipient.maskedAlias }})</dd></div>
           @if (p.status === 'SUCCESS' && p.transactionReference) {
-            <p data-testid="payment-reference">Referencia: {{ p.transactionReference }}</p>
+            <div class="kv" data-testid="payment-reference"><dt>Referencia</dt><dd>{{ p.transactionReference }}</dd></div>
           }
-        }
+          <div class="kv"><dt>Monto</dt><dd>{{ amount(p) }}</dd></div>
+          <div class="kv"><dt>Fecha y hora</dt><dd>{{ when(p) }}</dd></div>
+        </dl>
+
         @if (error()) {
-          <p role="alert" data-testid="payment-error">{{ error() }}</p>
+          <p class="alert" role="alert" data-testid="payment-error"><app-icon name="alert" /><span>{{ error() }}</span></p>
         }
-        @if (p.retryable) {
-          <button type="button" data-testid="retry" [disabled]="busy()" (click)="retry(p)">Reintentar</button>
-        }
-        @if (p.terminal) {
-          <a routerLink="/payments/new" data-testid="back">Volver</a>
-        }
-        <a routerLink="/payments" data-testid="to-history">Ver historial</a>
+        <div class="stack">
+          @if (p.retryable) {
+            <button type="button" class="btn" data-testid="retry" [disabled]="busy()" (click)="retry(p)">
+              {{ busy() ? 'Reintentando…' : 'Reintentar' }}
+            </button>
+          }
+          <a class="btn btn--navy" routerLink="/payments" data-testid="to-history">Ver mis movimientos</a>
+          @if (p.terminal) {
+            <a class="btn btn--outline" routerLink="/payments/new" data-testid="back">Hacer otro pago</a>
+          }
+        </div>
+        <p class="hint footnote">{{ notice }}</p>
       } @else if (error()) {
-        <p role="alert" data-testid="payment-error">{{ error() }}</p>
-        <a routerLink="/payments/new">Volver</a>
+        <p class="alert" role="alert" data-testid="payment-error"><app-icon name="alert" /><span>{{ error() }}</span></p>
+        <a class="btn btn--outline" routerLink="/payments/new">Volver</a>
       } @else {
-        <p role="status">Cargando…</p>
+        <p class="lead" role="status">Cargando…</p>
       }
-    </main>
+    </app-screen>
+  `,
+  styles: `
+    .state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.4rem;
+      margin-bottom: 1.25rem;
+      padding: 1.5rem 1rem;
+      border-radius: 1rem;
+      text-align: center;
+    }
+    .state .lead {
+      margin-bottom: 0.5rem;
+    }
+    .state--SUCCESS {
+      background: var(--brand-success-bg);
+    }
+    .state--FAILED,
+    .state--EXPIRED {
+      background: var(--brand-error-bg);
+    }
+    .state__icon {
+      display: grid;
+      place-items: center;
+      width: 4rem;
+      height: 4rem;
+      border-radius: 50%;
+      color: #fff;
+    }
+    .state__icon app-icon {
+      width: 2rem;
+      height: 2rem;
+    }
+    .state--SUCCESS .state__icon {
+      background: var(--brand-success);
+    }
+    .state--FAILED .state__icon,
+    .state--EXPIRED .state__icon {
+      background: var(--brand-error);
+    }
+    .state--SUCCESS .heading {
+      color: var(--brand-success);
+    }
+    .state--FAILED .heading,
+    .state--EXPIRED .heading {
+      color: var(--brand-error);
+    }
+    .spinner {
+      width: 5rem;
+      height: 5rem;
+      margin-bottom: 0.75rem;
+      border: 0.45rem solid #dce5fa;
+      border-top-color: var(--brand-accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .spinner {
+        animation: none;
+      }
+    }
+    .details {
+      margin: 0 0 1.25rem;
+    }
+    .note {
+      margin: 0 0 1rem;
+      padding: 0.7rem 0.85rem;
+      border-radius: 0.75rem;
+      background: var(--brand-background);
+      color: var(--brand-primary);
+      font-size: 0.875rem;
+    }
+    .footnote {
+      margin: 1rem 0 0;
+      text-align: center;
+    }
   `,
 })
 export class PaymentResultPage implements OnInit, OnDestroy {
@@ -72,6 +172,36 @@ export class PaymentResultPage implements OnInit, OnDestroy {
   protected readonly error = signal<string | null>(null);
   protected readonly busy = signal(false);
   protected readonly gaveUp = signal(false);
+
+  protected headline(payment: Payment): string {
+    switch (payment.status) {
+      case 'SUCCESS':
+        return 'Pago realizado';
+      case 'EXPIRED':
+        return 'El pago expiró';
+      default:
+        return 'No se pudo realizar el pago';
+    }
+  }
+
+  protected message(payment: Payment): string {
+    switch (payment.status) {
+      case 'SUCCESS':
+        return 'Tu pago se registró correctamente.';
+      case 'EXPIRED':
+        return 'No recibimos la confirmación a tiempo. No se realizó ningún cobro.';
+      default:
+        return 'No pudimos completar tu pago. Puedes intentarlo nuevamente.';
+    }
+  }
+
+  protected amount(payment: Payment): string {
+    return money(payment.amount, payment.currency);
+  }
+
+  protected when(payment: Payment): string {
+    return dateTimeLabel(payment.terminalAt ?? payment.createdAt);
+  }
 
   private paymentId = '';
   private polls = 0;

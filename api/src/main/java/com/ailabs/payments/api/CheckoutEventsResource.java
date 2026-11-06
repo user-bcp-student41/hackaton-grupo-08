@@ -4,6 +4,7 @@ import com.ailabs.onboarding.api.ApiException;
 import com.ailabs.onboarding.api.UserIdResolver;
 import com.ailabs.payments.domain.CheckoutEventType;
 import com.ailabs.payments.service.PaymentService;
+import com.ailabs.registration.AuthenticatedUserResolver;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.HeaderParam;
@@ -23,10 +24,14 @@ public class CheckoutEventsResource {
     @Inject
     PaymentService service;
 
+    @Inject
+    AuthenticatedUserResolver resolver;
+
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
-    public Response record(@HeaderParam(UserIdResolver.HEADER) String userHeader, CheckoutEventRequest body) {
-        String userId = UserIdResolver.resolve(userHeader);
+    public Response record(@HeaderParam("Authorization") String authorization,
+            @HeaderParam(UserIdResolver.HEADER) String userHeader, CheckoutEventRequest body) {
+        String userId = resolver.resolve(authorization, userHeader);
         if (body == null || body.eventType() == null) {
             throw ApiException.invalidFields(List.of(Map.of("field", "eventType", "reason", "REQUIRED")));
         }

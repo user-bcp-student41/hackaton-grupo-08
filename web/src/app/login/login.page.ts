@@ -3,43 +3,72 @@ import { Component, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { ApiErrorBody, AuthService, DocumentType } from '../core/auth.service';
 import { DOCUMENT_LENGTH, PASSWORD_LENGTH, digitsOnly, documentError, passwordError } from '../core/digits';
+import { AuthShellComponent } from '../core/ui/auth-shell.component';
+import { IconComponent } from '../core/ui/icon.component';
 
 /** Inicio de sesión con documento (DNI o CE) y contraseña enmascarada. */
 @Component({
   selector: 'app-login-page',
-  imports: [RouterLink],
+  imports: [RouterLink, AuthShellComponent, IconComponent],
   template: `
-    <main class="card">
-      <h1>Inicia sesión</h1>
+    <app-auth-shell title="Mi Billetera">
       <form (submit)="submit($event)" novalidate>
         <div class="field">
-          <label for="docType">Tipo de documento</label>
-          <select id="docType" (change)="documentType.set(asType($event))">
-            <option value="DNI">DNI</option>
-            <option value="CE">CE</option>
-          </select>
+          <label class="field__label" for="docType">Tipo de documento</label>
+          <div class="control">
+            <select id="docType" [value]="documentType()" (change)="documentType.set(asType($event))">
+              <option value="DNI">DNI</option>
+              <option value="CE">CE</option>
+            </select>
+            <span class="control__icon"><app-icon name="chevron-down" /></span>
+          </div>
         </div>
         <div class="field">
-          <label for="docNumber">Número de documento</label>
-          <input id="docNumber" type="text" inputmode="numeric" autocomplete="username" [attr.maxlength]="docLen"
-                 [value]="documentNumber()" (input)="onDigits($event, documentNumber, docLen)" />
-          @if (errors()['documentNumber']) { <span class="field-error">{{ errors()['documentNumber'] }}</span> }
+          <label class="field__label" for="docNumber">Número de documento</label>
+          <div class="control" [class.control--error]="errors()['documentNumber']">
+            <span class="control__icon"><app-icon name="user" /></span>
+            <input id="docNumber" type="text" inputmode="numeric" autocomplete="username" placeholder="12345678"
+                   [attr.maxlength]="docLen" [value]="documentNumber()"
+                   [attr.aria-invalid]="errors()['documentNumber'] ? 'true' : null"
+                   [attr.aria-describedby]="errors()['documentNumber'] ? 'docNumber-error' : null"
+                   (input)="onDigits($event, documentNumber, docLen)" />
+          </div>
+          @if (errors()['documentNumber']) {
+            <p class="field-error" id="docNumber-error" role="alert">
+              <app-icon name="alert" /><span>{{ errors()['documentNumber'] }}</span>
+            </p>
+          }
         </div>
         <div class="field">
-          <label for="password">Contraseña</label>
-          <input id="password" [type]="showPassword() ? 'text' : 'password'" inputmode="numeric"
-                 autocomplete="current-password" [attr.maxlength]="pwdLen" [value]="password()"
-                 (input)="onDigits($event, password, pwdLen)" />
-          <button type="button" class="btn-link" (click)="showPassword.set(!showPassword())">
-            {{ showPassword() ? 'Ocultar' : 'Mostrar' }} contraseña
-          </button>
-          @if (errors()['password']) { <span class="field-error">{{ errors()['password'] }}</span> }
+          <label class="field__label" for="password">Contraseña de 6 dígitos</label>
+          <div class="control" [class.control--error]="errors()['password']">
+            <span class="control__icon"><app-icon name="lock" /></span>
+            <input id="password" [type]="showPassword() ? 'text' : 'password'" inputmode="numeric"
+                   autocomplete="current-password" [attr.maxlength]="pwdLen" [value]="password()"
+                   [attr.aria-invalid]="errors()['password'] ? 'true' : null"
+                   [attr.aria-describedby]="errors()['password'] ? 'password-error' : null"
+                   (input)="onDigits($event, password, pwdLen)" />
+            <button type="button" class="control__action" (click)="showPassword.set(!showPassword())"
+                    [attr.aria-label]="showPassword() ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                    [attr.aria-pressed]="showPassword()">
+              <app-icon [name]="showPassword() ? 'eye-off' : 'eye'" />
+            </button>
+          </div>
+          @if (errors()['password']) {
+            <p class="field-error" id="password-error" role="alert">
+              <app-icon name="alert" /><span>{{ errors()['password'] }}</span>
+            </p>
+          }
         </div>
-        @if (formError()) { <p role="alert" class="field-error">{{ formError() }}</p> }
-        <button class="btn" type="submit" [disabled]="busy()">Ingresar</button>
+        @if (formError()) {
+          <p role="alert" class="alert"><app-icon name="alert" /><span>{{ formError() }}</span></p>
+        }
+        <div class="stack">
+          <button class="btn" type="submit" [disabled]="busy()">{{ busy() ? 'Ingresando…' : 'Ingresar' }}</button>
+          <a class="btn btn--outline" routerLink="/register">Crear cuenta</a>
+        </div>
       </form>
-      <p>¿Aún no tienes cuenta? <a routerLink="/register">Regístrate</a></p>
-    </main>
+    </app-auth-shell>
   `,
 })
 export class LoginPage {
@@ -81,10 +110,10 @@ export class LoginPage {
     this.auth
       .login({ documentType: this.documentType(), documentNumber: this.documentNumber(), password: this.password() })
       .subscribe({
-        next: (r) => {
+        next: () => {
           this.password.set('');
           this.busy.set(false);
-          void this.router.navigateByUrl(r.paymentsEntryPoint);
+          void this.router.navigateByUrl('/home');
         },
         error: (e: HttpErrorResponse) => {
           this.busy.set(false);

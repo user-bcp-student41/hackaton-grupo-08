@@ -7,6 +7,7 @@ import com.ailabs.payments.service.PaymentCommand;
 import com.ailabs.payments.service.PaymentPage;
 import com.ailabs.payments.service.PaymentResult;
 import com.ailabs.payments.service.PaymentService;
+import com.ailabs.registration.AuthenticatedUserResolver;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
@@ -41,20 +42,25 @@ public class PaymentResource {
     @Inject
     PaymentService service;
 
+    @Inject
+    AuthenticatedUserResolver resolver;
+
     @POST
     @Path("/validate")
     @Consumes(MediaType.APPLICATION_JSON)
-    public ValidationResponse validate(@HeaderParam(UserIdResolver.HEADER) String userHeader, PaymentRequest body) {
-        String userId = UserIdResolver.resolve(userHeader);
+    public ValidationResponse validate(@HeaderParam("Authorization") String authorization,
+            @HeaderParam(UserIdResolver.HEADER) String userHeader, PaymentRequest body) {
+        String userId = resolver.resolve(authorization, userHeader);
         PaymentCommand command = PaymentRequest.toCommand(body);
         return ValidationResponse.from(service.validate(userId, command));
     }
 
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
-    public Response create(@HeaderParam(UserIdResolver.HEADER) String userHeader,
+    public Response create(@HeaderParam("Authorization") String authorization,
+            @HeaderParam(UserIdResolver.HEADER) String userHeader,
             @HeaderParam(IDEMPOTENCY_HEADER) String idempotencyKey, PaymentRequest body) {
-        String userId = UserIdResolver.resolve(userHeader);
+        String userId = resolver.resolve(authorization, userHeader);
         String key = parseKey(idempotencyKey);
         PaymentCommand command = PaymentRequest.toCommand(body);
         return toResponse(service.create(userId, key, command));
@@ -62,25 +68,27 @@ public class PaymentResource {
 
     @GET
     @Path("/{paymentId}")
-    public PaymentResponse get(@HeaderParam(UserIdResolver.HEADER) String userHeader,
-            @PathParam("paymentId") String paymentId) {
-        String userId = UserIdResolver.resolve(userHeader);
+    public PaymentResponse get(@HeaderParam("Authorization") String authorization,
+            @HeaderParam(UserIdResolver.HEADER) String userHeader, @PathParam("paymentId") String paymentId) {
+        String userId = resolver.resolve(authorization, userHeader);
         return PaymentResponse.from(service.get(userId, paymentId));
     }
 
     @POST
     @Path("/{paymentId}/retry")
-    public Response retry(@HeaderParam(UserIdResolver.HEADER) String userHeader,
+    public Response retry(@HeaderParam("Authorization") String authorization,
+            @HeaderParam(UserIdResolver.HEADER) String userHeader,
             @HeaderParam(IDEMPOTENCY_HEADER) String idempotencyKey, @PathParam("paymentId") String paymentId) {
-        String userId = UserIdResolver.resolve(userHeader);
+        String userId = resolver.resolve(authorization, userHeader);
         String key = parseKey(idempotencyKey);
         return toResponse(service.retry(userId, paymentId, key));
     }
 
     @GET
-    public HistoryResponse history(@HeaderParam(UserIdResolver.HEADER) String userHeader,
-            @QueryParam("page") String page, @QueryParam("size") String size, @QueryParam("status") String status) {
-        String userId = UserIdResolver.resolve(userHeader);
+    public HistoryResponse history(@HeaderParam("Authorization") String authorization,
+            @HeaderParam(UserIdResolver.HEADER) String userHeader, @QueryParam("page") String page,
+            @QueryParam("size") String size, @QueryParam("status") String status) {
+        String userId = resolver.resolve(authorization, userHeader);
         int pageNumber = parseInt(page, 0, 0, Integer.MAX_VALUE / MAX_PAGE_SIZE, "page");
         int pageSize = parseInt(size, DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE, "size");
         PaymentStatus filter = parseStatus(status);
